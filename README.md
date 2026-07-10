@@ -1,4 +1,4 @@
-                                                                # 🎓 SmartStudy AI
+# 🎓 SmartStudy AI
 
 Your personal AI-powered study companion. Upload your notes and get instant explanations, quizzes, flashcards, summaries, and personalized study plans — all in one platform.
 
