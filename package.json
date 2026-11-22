@@ -1,12 +1,15 @@
 {
   "name": "smartstudy-ai",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
+  "description": "AI-powered study platform with Gemini AI Tutor, Quiz/Flashcards/Mind Map generator, PDF/OCR note parsing, YouTube summarizer, Study Planner & Mobile PWA.",
+  "author": "Nafees Ahmed Bhatti",
+  "license": "MIT",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "vite preview --host 0.0.0.0 --port 3000"
+    "start": "node server.js"
   },
   "dependencies": {
     "framer-motion": "^12.38.0",

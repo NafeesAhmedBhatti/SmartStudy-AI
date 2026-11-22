@@ -10,43 +10,9 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="SmartStudy AI" />
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="0" />
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:#D7F3E1;color:#111111;-webkit-font-smoothing:antialiased;overflow-x:hidden}
-    #root{min-height:100vh}
-    ::-webkit-scrollbar{width:5px}
-    ::-webkit-scrollbar-track{background:transparent}
-    ::-webkit-scrollbar-thumb{background:rgba(50,201,113,0.25);border-radius:10px}
-    ::-webkit-scrollbar-thumb:hover{background:rgba(50,201,113,0.4)}
-    ::selection{background:rgba(50,201,113,0.2)}
-  </style>
 </head>
 <body>
   <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>
-  <script>
-    // Immediately kill any old service worker and clear all caches
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));
-    }
-    if ('caches' in window) {
-      caches.keys().then(ks => ks.forEach(k => caches.delete(k)));
-    }
-  </script>
-  <script>
-    // Fallback: if app still blank after 4s, hard reload
-    setTimeout(() => {
-      const root = document.getElementById('root');
-      if (root && !root.children.length) {
-        if ('caches' in window) caches.keys().then(ks => ks.forEach(k => caches.delete(k)));
-        if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));
-        setTimeout(() => location.reload(true), 300);
-      }
-    }, 4000);
-  </script>
 </body>
 </html>
