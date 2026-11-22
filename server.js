@@ -7,6 +7,90 @@ const { YoutubeTranscript } = require('youtube-transcript');
 const PORT = 3000;
 const DIST = path.join(__dirname, 'dist');
 
+// Load .env manually without requiring extra packages
+let GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+try {
+  const envFile = fs.readFileSync(path.join(__dirname, '.env'), 'utf8');
+  for (const line of envFile.split(/\r?\n/)) {
+    const match = line.match(/^GEMINI_API_KEY=(.+)$/);
+    if (match) GEMINI_API_KEY = match[1].trim();
+  }
+} catch {}
+
+function httpsPostJson(url, payload) {
+  return new Promise((resolve, reject) => {
+    const data = JSON.stringify(payload);
+    const u = new URL(url);
+    const req = https.request({
+      hostname: u.hostname,
+      path: u.pathname + u.search,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(data)
+      },
+      timeout: 30000
+    }, (res) => {
+      let body = '';
+      res.on('data', c => body += c);
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, json: JSON.parse(body) }); }
+        catch { resolve({ status: res.statusCode, json: { raw: body } }); }
+      });
+    });
+    req.on('error', reject);
+    req.on('timeout', () => { req.destroy(); reject(new Error('Request timeout')); });
+    req.write(data);
+    req.end();
+  });
+}
+
+async function callGeminiChat(messages) {
+  if (!GEMINI_API_KEY) throw new Error('GEMINI_API_KEY not configured in .env');
+
+  let systemInstruction = '';
+  const contents = [];
+
+  for (const m of messages) {
+    if (m.role === 'system') {
+      systemInstruction += (systemInstruction ? '\n\n' : '') + (m.content || '');
+    } else {
+      contents.push({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: String(m.content || '') }]
+      });
+    }
+  }
+
+  // Gemini requires at least one message in contents (Study Tools preset prompts pass empty history)
+  if (contents.length === 0) {
+    contents.push({
+      role: 'user',
+      parts: [{ text: systemInstruction || 'Proceed.' }]
+    });
+    systemInstruction = '';
+  }
+
+  const payload = { contents };
+  if (systemInstruction) {
+    payload.systemInstruction = { parts: [{ text: systemInstruction }] };
+  }
+
+  const models = ['gemini-3.5-flash-lite', 'gemini-3.8-flash'];
+  let lastErr = 'Unknown AI error';
+
+  for (const model of models) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`;
+    const resp = await httpsPostJson(url, payload);
+    if (resp.status === 200 && resp.json?.candidates?.[0]?.content?.parts?.[0]?.text) {
+      return resp.json.candidates[0].content.parts[0].text;
+    }
+    lastErr = resp.json?.error?.message || `HTTP ${resp.status}`;
+  }
+
+  throw new Error(lastErr);
+}
+
 const MIME = {
   '.html': 'text/html',
   '.js': 'application/javascript',
@@ -75,6 +159,25 @@ const server = http.createServer(async (req, res) => {
   }
 
   const url = new URL(req.url, `http://${req.headers.host}`);
+
+  // AI Chat Proxy API endpoint (Gemini)
+  if (url.pathname === '/api/chat' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', async () => {
+      try {
+        const parsed = JSON.parse(body || '{}');
+        const reply = await callGeminiChat(parsed.messages || []);
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({ choices: [{ message: { content: reply } }] }));
+      } catch (e) {
+        console.error('AI Chat Error:', e.message);
+        res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({ error: { message: e.message } }));
+      }
+    });
+    return;
+  }
 
   // YouTube transcript API endpoint
   if (url.pathname === '/api/youtube-transcript' && req.method === 'GET') {

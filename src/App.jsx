@@ -25,7 +25,7 @@ import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, ResponsiveContaine
 // ═══════════════════════════════════════════════════════════════
 // THEME — Soft Pastel Mint Green (Reference Match)
 // ═══════════════════════════════════════════════════════════════
-const T = {
+const LIGHT = {
   bg: '#D7F3E1', bg2: '#E6FCEF', bg3: '#EAF9F0',
   sidebar: '#32C971', sidebarHover: '#2AB862',
   surface: '#FFFFFF', surface2: '#F5F3F4', surface3: '#F0EEEF',
@@ -49,6 +49,7 @@ const T = {
   red: '#EF4444', redSoft: 'rgba(239,68,68,0.10)',
   pink: '#EC4899', pinkSoft: 'rgba(236,72,153,0.10)',
   blue: '#0EA5E9', blueSoft: 'rgba(14,165,233,0.10)',
+  isDark: false,
 };
 
 const DARK = {
@@ -79,8 +80,9 @@ const DARK = {
 
 // Active theme getter — default to light
 function getTheme() {
-  try { return JSON.parse(localStorage.getItem('smartstudy_dark')) === true ? DARK : T; } catch { return T; }
+  try { return JSON.parse(localStorage.getItem('smartstudy_dark')) === true ? DARK : LIGHT; } catch { return LIGHT; }
 }
+const T = { ...getTheme() };
 
 const Ic = (Icon, s = 18, color = T.text2) => <Icon size={s} color={color} strokeWidth={1.7} />;
 
@@ -116,19 +118,28 @@ function renderMD(text) {
   const rendered = blocks.map((block, bi) => {
     const lines = block.split('\n');
     return lines.map((line, li) => {
-      // Headings
-      if (line.startsWith('## ')) return <div key={`${bi}-${li}`} style={{ fontSize: isMob ? 13 : 15, fontWeight: 700, marginTop: li === 0 ? 0 : 12, marginBottom: 4, color: T.text }}>{inlineMD(line.slice(3), mathBlocks)}</div>;
-      if (line.startsWith('# ')) return <div key={`${bi}-${li}`} style={{ fontSize: isMob ? 14 : 17, fontWeight: 800, marginTop: li === 0 ? 0 : 14, marginBottom: 6, color: T.text }}>{inlineMD(line.slice(2), mathBlocks)}</div>;
+      const trimmed = line.trim();
+      // Horizontal divider (--- or ***)
+      if (/^[-*_]{3,}$/.test(trimmed)) return <div key={`${bi}-${li}`} style={{ height: 1, background: T.border, margin: '10px 0' }} />;
+      // Headings (####, ###, ##, #)
+      if (trimmed.startsWith('#### ')) return <div key={`${bi}-${li}`} style={{ fontSize: isMob ? 12 : 13, fontWeight: 700, marginTop: li === 0 ? 0 : 8, marginBottom: 3, color: T.text }}>{inlineMD(trimmed.slice(5), mathBlocks)}</div>;
+      if (trimmed.startsWith('### ')) return <div key={`${bi}-${li}`} style={{ fontSize: isMob ? 13 : 14, fontWeight: 700, marginTop: li === 0 ? 0 : 10, marginBottom: 4, color: T.text }}>{inlineMD(trimmed.slice(4), mathBlocks)}</div>;
+      if (trimmed.startsWith('## ')) return <div key={`${bi}-${li}`} style={{ fontSize: isMob ? 13 : 15, fontWeight: 700, marginTop: li === 0 ? 0 : 12, marginBottom: 4, color: T.text }}>{inlineMD(trimmed.slice(3), mathBlocks)}</div>;
+      if (trimmed.startsWith('# ')) return <div key={`${bi}-${li}`} style={{ fontSize: isMob ? 14 : 17, fontWeight: 800, marginTop: li === 0 ? 0 : 14, marginBottom: 6, color: T.text }}>{inlineMD(trimmed.slice(2), mathBlocks)}</div>;
       // Blockquote
-      if (line.startsWith('> ')) return <div key={`${bi}-${li}`} style={{ borderLeft: `3px solid ${T.mint}`, paddingLeft: 12, margin: '6px 0', fontSize: isMob ? 11 : 12, color: T.text2, fontStyle: 'italic', background: `${T.mint}08`, padding: '8px 12px', borderRadius: 8 }}>{inlineMD(line.slice(2), mathBlocks)}</div>;
-      // Bullet
-      if (/^[•\-\*]\s/.test(line)) return <div key={`${bi}-${li}`} style={{ display: 'flex', gap: 8, margin: '3px 0', fontSize: isMob ? 12 : 13, lineHeight: 1.7 }}><span style={{ color: T.mint, fontWeight: 700, flexShrink: 0 }}>•</span><span>{inlineMD(line.replace(/^[•\-\*]\s/, ''), mathBlocks)}</span></div>;
+      if (trimmed.startsWith('> ')) return <div key={`${bi}-${li}`} style={{ borderLeft: `3px solid ${T.mint}`, margin: '6px 0', fontSize: isMob ? 11 : 12, color: T.text2, fontStyle: 'italic', background: `${T.mint}08`, padding: '8px 12px', borderRadius: 8 }}>{inlineMD(trimmed.slice(2), mathBlocks)}</div>;
+      // Bullet (including indented nested bullets)
+      if (/^\s*[•\-\*]\s/.test(line)) {
+        const indent = line.match(/^(\s*)/)?.[1]?.length || 0;
+        const padLeft = Math.min(24, Math.floor(indent / 2) * 12);
+        return <div key={`${bi}-${li}`} style={{ display: 'flex', gap: 8, margin: '3px 0', paddingLeft: padLeft, fontSize: isMob ? 12 : 13, lineHeight: 1.65 }}><span style={{ color: T.mint, fontWeight: 700, flexShrink: 0 }}>•</span><span style={{ flex: 1, minWidth: 0 }}>{inlineMD(line.replace(/^\s*[•\-\*]\s/, ''), mathBlocks)}</span></div>;
+      }
       // Numbered list
-      if (/^\d+[\.\)]\s/.test(line)) { const num = line.match(/^(\d+)/)?.[1]; return <div key={`${bi}-${li}`} style={{ display: 'flex', gap: 8, margin: '3px 0', fontSize: isMob ? 12 : 13, lineHeight: 1.7 }}><span style={{ color: T.mint, fontWeight: 700, flexShrink: 0, width: 18 }}>{num}.</span><span>{inlineMD(line.replace(/^\d+[\.\)]\s/, ''), mathBlocks)}</span></div>; }
+      if (/^\s*\d+[\.\)]\s/.test(line)) { const num = trimmed.match(/^(\d+)/)?.[1]; return <div key={`${bi}-${li}`} style={{ display: 'flex', gap: 8, margin: '3px 0', fontSize: isMob ? 12 : 13, lineHeight: 1.65 }}><span style={{ color: T.mint, fontWeight: 700, flexShrink: 0, width: 18 }}>{num}.</span><span style={{ flex: 1, minWidth: 0 }}>{inlineMD(trimmed.replace(/^\d+[\.\)]\s/, ''), mathBlocks)}</span></div>; }
       // Empty line
-      if (!line.trim()) return <div key={`${bi}-${li}`} style={{ height: 6 }} />;
-      // Regular paragraph (may contain math placeholders)
-      return <div key={`${bi}-${li}`} style={{ margin: '4px 0', fontSize: isMob ? 12 : 13, lineHeight: 1.75 }}>{inlineMD(line, mathBlocks)}</div>;
+      if (!trimmed) return <div key={`${bi}-${li}`} style={{ height: 5 }} />;
+      // Regular paragraph
+      return <div key={`${bi}-${li}`} style={{ margin: '4px 0', fontSize: isMob ? 12 : 13, lineHeight: 1.7 }}>{inlineMD(line, mathBlocks)}</div>;
     });
   });
   return <>{rendered}</>;
@@ -140,30 +151,26 @@ function inlineMD(text, mathBlocks = []) {
   let remaining = text;
   let key = 0;
   while (remaining) {
-    // Math block placeholders first
     const mathMatch = remaining.match(/MATHBLOCK(\d+)END/);
-    // Bold
     const boldMatch = remaining.match(/\*\*(.+?)\*\*/);
-    // Italic
-    const italicMatch = remaining.match(/\*(.+?)\*/);
-    // Code inline
-    const codeMatch = remaining.match(/`(.+?)`/);
+    const italicMatch = remaining.match(/(?<!\*)\*([^\*\n]+?)\*(?!\*)/);
+    const codeMatch = remaining.match(/`([^`]+?)`/);
     
     const matches = [
       mathMatch ? { type: 'math', match: mathMatch, index: mathMatch.index } : null,
       boldMatch ? { type: 'bold', match: boldMatch, index: boldMatch.index } : null,
-      italicMatch && !boldMatch ? { type: 'italic', match: italicMatch, index: italicMatch.index } : null,
+      italicMatch ? { type: 'italic', match: italicMatch, index: italicMatch.index } : null,
       codeMatch ? { type: 'code', match: codeMatch, index: codeMatch.index } : null,
     ].filter(Boolean).sort((a, b) => a.index - b.index);
 
-    if (matches.length === 0) { parts.push(<span key={key++}>{remaining}</span>); break; }
+    if (matches.length === 0) { parts.push(<span key={key++}>{remaining.replace(/\*\*/g, '')}</span>); break; }
     const first = matches[0];
-    if (first.index > 0) parts.push(<span key={key++}>{remaining.slice(0, first.index)}</span>);
+    if (first.index > 0) parts.push(<span key={key++}>{remaining.slice(0, first.index).replace(/\*\*/g, '')}</span>);
     if (first.type === 'math') {
       const idx = parseInt(first.match[1]);
       parts.push(<span key={key++} dangerouslySetInnerHTML={{ __html: mathBlocks[idx] || '' }} />);
     }
-    else if (first.type === 'bold') parts.push(<strong key={key++} style={{ fontWeight: 700, color: T.deepGreen }}>{first.match[1]}</strong>);
+    else if (first.type === 'bold') parts.push(<strong key={key++} style={{ fontWeight: 700, color: T.isDark ? '#7EE787' : T.deepGreen }}>{first.match[1]}</strong>);
     else if (first.type === 'italic') parts.push(<em key={key++} style={{ fontStyle: 'italic', color: T.text2 }}>{first.match[1]}</em>);
     else if (first.type === 'code') parts.push(<code key={key++} style={{ background: T.bg2, padding: '1px 5px', borderRadius: 4, fontSize: 12, fontFamily: 'monospace' }}>{first.match[1]}</code>);
     remaining = remaining.slice(first.index + first.match[0].length);
@@ -623,9 +630,10 @@ const LANGUAGE_INSTRUCTIONS = {
 const callAI = async (sys, hist = [], lang = 'English') => {
   const langInstruction = LANGUAGE_INSTRUCTIONS[lang] || LANGUAGE_INSTRUCTIONS.English;
   const fullSystem = `${sys}\n\n${langInstruction}`;
-  const r = await fetch(`${window.__AI_BASE_URL}/v1/chat/completions`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${window.__AI_API_KEY}` },
-    body: JSON.stringify({ model: 'drytis/kimi-k2.5', max_tokens: 3000, messages: [{ role: 'system', content: fullSystem }, ...hist] }),
+  const r = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages: [{ role: 'system', content: fullSystem }, ...hist] }),
   });
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error?.message || `Error ${r.status}`); }
   return (await r.json()).choices?.[0]?.message?.content || 'No response.';
@@ -2025,9 +2033,9 @@ function StudyToolsPage({ notes, onClearNotes, onUploadNotes, onAddNote, stats, 
   };
 
   return (
-    <div style={{ display: 'flex', height: isMobile ? 'calc(100vh - 56px - 56px)' : '100%', animation: 'slide-up .4s ease' }}>
+    <div style={{ display: 'flex', height: isMobile ? '100%' : 'calc(100vh - 114px)', overflow: 'hidden', borderRadius: isMobile ? 0 : 16, border: isMobile ? 'none' : `1px solid ${T.border}`, background: T.surface, animation: 'slide-up .4s ease' }}>
       {/* Left: Premium Tools Panel */}
-      {!isMobile && <div style={{ width: 310, background: 'linear-gradient(180deg, #FFFFFF 0%, #F0FDF4 100%)', borderRight: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+      {!isMobile && <div style={{ width: 310, background: T.surface, borderRight: `1px solid ${T.border}`, display: 'flex', flexDirection: 'column', flexShrink: 0, overflowY: 'auto' }}>
 
         {/* Upload Notes Button */}
         <div style={{ padding: '14px 16px 8px' }}>
@@ -2075,8 +2083,8 @@ function StudyToolsPage({ notes, onClearNotes, onUploadNotes, onAddNote, stats, 
 	                    padding: isMobile ? '10px 10px' : '12px 14px', borderRadius: 14, fontSize: isMobile ? 11 : 13,
 	                    fontWeight: active ? 700 : 500,
 	                    background: active
-	      ? `linear-gradient(135deg, ${t.color}10, ${t.color}08)`
-	      : '#FFFFFF',
+	      ? `linear-gradient(135deg, ${t.color}15, ${t.color}08)`
+	      : T.surface,
 	                    color: active ? t.color : T.text2,
 	                    border: active ? `1.5px solid ${t.color}35` : `1px solid ${T.border}`,
 	                    cursor: loading ? 'not-allowed' : 'pointer',
@@ -2124,27 +2132,37 @@ function StudyToolsPage({ notes, onClearNotes, onUploadNotes, onAddNote, stats, 
 
       {/* Right: Premium Chat */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, background: T.bg }}>
-        {/* Mobile tool selector */}
-        {isMobile && <div style={{ display: 'flex', gap: 4, padding: '8px 8px 0', overflowX: 'auto', flexShrink: 0, alignItems: 'center' }}>
-          <input id="study-mobile-upload" type="file" accept=".txt,.pdf,.doc,.docx,.png,.jpg,.jpeg,.bmp,.tiff,.webp" style={{ display: 'none' }} onChange={e => { const f = e.target.files[0]; if (f) handleFileUpload(f); e.target.value = ''; }} />
-          {uploading ? (
-            <div style={{ padding: '6px 12px', borderRadius: 8, background: `${T.mint}10`, border: `1px solid ${T.mint}30`, display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: T.mint, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
-              <span style={{ width: 12, height: 12, border: `2px solid ${T.mint}30`, borderTopColor: T.mint, borderRadius: '50%', animation: 'spin-slow 0.8s linear infinite', display: 'inline-block' }} />
-              {uploadProgress}
+        {/* Mobile tool grid (4x2 — zero horizontal scroll!) */}
+        {isMobile && (
+          <div style={{ padding: '8px 10px', background: T.surface, borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
+            <input id="study-mobile-upload" type="file" accept=".txt,.pdf,.doc,.docx,.png,.jpg,.jpeg,.bmp,.tiff,.webp" style={{ display: 'none' }} onChange={e => { const f = e.target.files[0]; if (f) handleFileUpload(f); e.target.value = ''; }} />
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6 }}>
+              <button onClick={() => document.getElementById('study-mobile-upload').click()}
+                style={{ padding: '7px 4px', borderRadius: 10, border: `1.5px dashed ${T.mint}`, background: `${T.mint}12`, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, color: T.mint }}>
+                {uploading ? (
+                  <span style={{ width: 14, height: 14, border: `2px solid ${T.mint}30`, borderTopColor: T.mint, borderRadius: '50%', animation: 'spin-slow 0.8s linear infinite', display: 'inline-block' }} />
+                ) : Ic(Upload, 14, T.mint)}
+                <span style={{ fontSize: 9.5, fontWeight: 700, whiteSpace: 'nowrap' }}>{notes ? 'Replace' : 'Upload'}</span>
+              </button>
+              {STUDY_TOOLS.map(t => {
+                const active = activeTool === t.id;
+                return (
+                  <button key={t.id} onClick={() => sendTool(t.id)}
+                    style={{ padding: '7px 4px', borderRadius: 10, border: active ? `1.5px solid ${t.color}` : `1px solid ${T.border}`, background: active ? `${t.color}15` : T.bg2, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, color: active ? t.color : T.text2, transition: 'all .15s' }}>
+                    {Ic(t.icon, 14, active ? t.color : t.color)}
+                    <span style={{ fontSize: 9.5, fontWeight: active ? 700 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>{t.label}</span>
+                  </button>
+                );
+              })}
             </div>
-          ) : (
-            <button onClick={() => document.getElementById('study-mobile-upload').click()}
-              style={{ padding: '6px 10px', borderRadius: 8, border: `1.5px solid ${T.mint}`, background: `${T.mint}10`, cursor: 'pointer', fontSize: 11, fontWeight: 700, color: T.mint, whiteSpace: 'nowrap', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
-              {Ic(Upload, 12)} {notes ? 'Replace' : 'Upload'}
-            </button>
-          )}
-          {STUDY_TOOLS.map(t => (
-            <button key={t.id} onClick={() => { setActiveTool(t.id); setMessages([]); setInput(''); }}
-              style={{ padding: '6px 10px', borderRadius: 8, border: activeTool === t.id ? `1.5px solid ${t.color}` : `1px solid ${T.border}`, background: activeTool === t.id ? `${t.color}10` : T.surface, cursor: 'pointer', fontSize: 11, fontWeight: activeTool === t.id ? 700 : 400, color: activeTool === t.id ? t.color : T.text2, whiteSpace: 'nowrap', flexShrink: 0 }}>
-              {t.label}
-            </button>
-          ))}
-        </div>}
+            {notes && (
+              <div style={{ marginTop: 6, padding: '4px 10px', borderRadius: 8, background: `${T.mint}12`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 10, color: T.mint, fontWeight: 600 }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📄 {notes.name} ({notes.wc}w)</span>
+                <button onClick={onClearNotes} style={{ background: 'none', border: 'none', color: T.text3, cursor: 'pointer', padding: '0 2px', fontSize: 11 }}>✕</button>
+              </div>
+            )}
+          </div>
+        )}
         <div ref={chatRef} style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px 12px' : '28px 24px' }}>
           <div style={{ maxWidth: 680, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: isMobile ? 12 : 20 }}>
             {messages.length === 0 && (
@@ -2325,7 +2343,7 @@ function AIChatPage({ stats, earnXP, trackAIQuery, language }) {
         };
         sys = prompts[essayMode] || prompts.outline;
       } else {
-        sys = 'You are SmartStudy AI, a helpful and encouraging study assistant. Give clear, concise answers. Use bullet points and examples when helpful.';
+        sys = 'You are SmartStudy AI, a concise and precise study assistant. Answer ONLY what the user asked—directly, clearly, and without unnecessary filler, fluff, or long generic introductions. Keep explanations neat, structured, and easy to read.';
       }
       const nm = [...messages, { role: 'user', content: t }];
       const ai = await callAI(sys, nm.map(m => ({ role: m.role, content: m.content })), language);
@@ -2397,30 +2415,45 @@ function AIChatPage({ stats, earnXP, trackAIQuery, language }) {
   ];
 
 return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: isMobile ? 'calc(100dvh - 112px)' : '100%', background: T.bg, overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: T.bg, overflow: 'hidden' }}>
       {/* Mode tabs bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 3 : 4, padding: isMobile ? '6px 6px' : '12px 24px', borderBottom: `1px solid ${T.border}`, background: '#FFFFFF', flexShrink: 0, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-        {modeTabs.map(tab => (
-          <button key={tab.id} onClick={() => { setMode(tab.id); setMessages([]); }}
-            style={{ padding: isMobile ? '5px 8px' : '8px 16px', borderRadius: isMobile ? 7 : 10, border: mode === tab.id ? `2px solid ${T.mint}` : `1px solid ${T.border}`, background: mode === tab.id ? `${T.mint}10` : T.surface2, cursor: 'pointer', fontSize: isMobile ? 10 : 12, fontWeight: mode === tab.id ? 700 : 500, color: mode === tab.id ? T.mint : T.text2, display: 'flex', alignItems: 'center', gap: isMobile ? 2 : 6, whiteSpace: 'nowrap', flexShrink: 0, transition: 'all .15s' }}>
-            {Ic(tab.icon, isMobile ? 10 : 13)} {isMobile ? tab.label.slice(0, 5) : tab.label}
-          </button>
-        ))}
-        {/* Essay sub-modes */}
-        {mode === 'essay' && (
-          <div style={{ marginLeft: isMobile ? 2 : 8, display: 'flex', gap: 2, overflowX: 'auto' }}>
-            {essayModes.map(em => (
-              <button key={em.id} onClick={() => setEssayMode(em.id)}
-                style={{ padding: isMobile ? '3px 5px' : '5px 10px', borderRadius: isMobile ? 5 : 8, border: essayMode === em.id ? `1px solid ${T.pink}` : `1px solid ${T.border}`, background: essayMode === em.id ? `${T.pink}10` : 'transparent', cursor: 'pointer', fontSize: isMobile ? 8 : 11, fontWeight: essayMode === em.id ? 600 : 400, color: essayMode === em.id ? T.pink : T.text3, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                {em.label}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 6 : 0, padding: isMobile ? '8px 10px' : '12px 24px', borderBottom: `1px solid ${T.border}`, background: T.surface, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 6 : 8, width: '100%' }}>
+          <div style={{ display: isMobile ? 'grid' : 'flex', gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : undefined, gap: isMobile ? 6 : 6, flex: isMobile ? 1 : 'none' }}>
+            {modeTabs.map(tab => (
+              <button key={tab.id} onClick={() => { setMode(tab.id); setMessages([]); }}
+                style={{ padding: isMobile ? '7px 6px' : '8px 16px', borderRadius: isMobile ? 9 : 10, border: mode === tab.id ? `1.5px solid ${T.mint}` : `1px solid ${T.border}`, background: mode === tab.id ? `${T.mint}14` : T.surface2, cursor: 'pointer', fontSize: isMobile ? 11 : 12, fontWeight: mode === tab.id ? 700 : 500, color: mode === tab.id ? T.mint : T.text2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isMobile ? 4 : 6, whiteSpace: 'nowrap', transition: 'all .15s' }}>
+                {Ic(tab.icon, isMobile ? 12 : 13, mode === tab.id ? T.mint : T.text2)} {isMobile && tab.id === 'essay' ? 'Essay' : tab.label}
               </button>
             ))}
           </div>
-        )}
-        {messages.length > 0 && (
-          <div style={{ marginLeft: 'auto', flexShrink: 0 }}>
-            <button onClick={() => { const text = messages.map(m => `[${m.role === 'user' ? 'You' : 'AI'}]\n${m.content}\n`).join('\n---\n\n'); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' })); a.download = `smartstudy-${mode}.txt`; a.click(); }}
-              style={{ padding: isMobile ? '3px 6px' : '5px 10px', borderRadius: 6, background: T.surface2, border: `1px solid ${T.border}`, cursor: 'pointer', fontSize: isMobile ? 8 : 10, fontWeight: 600 }}>{Ic(Download, isMobile ? 8 : 11)}</button>
+          {/* Desktop essay sub-modes inline */}
+          {!isMobile && mode === 'essay' && (
+            <div style={{ marginLeft: 8, display: 'flex', gap: 4 }}>
+              {essayModes.map(em => (
+                <button key={em.id} onClick={() => setEssayMode(em.id)}
+                  style={{ padding: '5px 10px', borderRadius: 8, border: essayMode === em.id ? `1px solid ${T.pink}` : `1px solid ${T.border}`, background: essayMode === em.id ? `${T.pink}12` : 'transparent', cursor: 'pointer', fontSize: 11, fontWeight: essayMode === em.id ? 600 : 400, color: essayMode === em.id ? T.pink : T.text3, whiteSpace: 'nowrap' }}>
+                  {em.label}
+                </button>
+              ))}
+            </div>
+          )}
+          {messages.length > 0 && (
+            <div style={{ marginLeft: 'auto', flexShrink: 0 }}>
+              <button onClick={() => { const text = messages.map(m => `[${m.role === 'user' ? 'You' : 'AI'}]\n${m.content}\n`).join('\n---\n\n'); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' })); a.download = `smartstudy-${mode}.txt`; a.click(); }}
+                style={{ padding: isMobile ? '6px 8px' : '6px 10px', borderRadius: 8, background: T.surface2, border: `1px solid ${T.border}`, cursor: 'pointer', fontSize: isMobile ? 10 : 11, fontWeight: 600, color: T.text2 }}>{Ic(Download, isMobile ? 12 : 12, T.text2)}</button>
+            </div>
+          )}
+        </div>
+        {/* Mobile essay sub-modes on clean 4-column row 2 */}
+        {isMobile && mode === 'essay' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, width: '100%' }}>
+            {essayModes.map(em => (
+              <button key={em.id} onClick={() => setEssayMode(em.id)}
+                style={{ padding: '6px 2px', borderRadius: 8, border: essayMode === em.id ? `1.5px solid ${T.pink}` : `1px solid ${T.border}`, background: essayMode === em.id ? `${T.pink}12` : T.bg2, cursor: 'pointer', fontSize: 10, fontWeight: essayMode === em.id ? 700 : 500, color: essayMode === em.id ? T.pink : T.text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>
+                {em.label}
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -2576,8 +2609,8 @@ function PlannerPage({ language }) {
   });
   const [modalOpen, setModalOpen] = useState(false);
   const [editSession, setEditSession] = useState(null);
-  const [viewMode, setViewMode] = useState('week'); // 'week' | 'day'
-  const [activeDay, setActiveDay] = useState(0);
+  const [viewMode, setViewMode] = useState(() => (typeof window !== 'undefined' && window.innerWidth < 768 ? 'day' : 'week')); // 'week' | 'day'
+  const [activeDay, setActiveDay] = useState(() => { const d = new Date().getDay(); return d === 0 ? 6 : d - 1; });
   const [aiLoading, setAiLoading] = useState(false);
   const [aiTips, setAiTips] = useState([]);
   const [dragOver, setDragOver] = useState(null);
@@ -2815,7 +2848,7 @@ Return ONLY the JSON array, no other text.`;
         {[
           { icon: Clock, label: 'This Week', value: `${totalWeekHours}h`, color: T.mint },
           { icon: Calendar, label: 'Today', value: `${todayHours}h`, color: T.sky },
-          { icon: BookOpen, label: 'Subjects', value: subjectHours.length, color: T.violet },
+          { icon: BookOpen, label: 'Subjects', value: subjects.length, color: T.violet },
           { icon: Target, label: 'Sessions', value: sessions.length, color: T.amber },
         ].map((s, i) => (
           <div key={i} style={{ padding: isMobile ? '10px 12px' : '16px 20px', borderRadius: 14, background: T.surface, border: `1px solid ${T.border}`,
@@ -3759,16 +3792,17 @@ function TasksPage({ tasks, onToggle, onAdd, onDelete, earnXP, stats }) {
   const isMobile = ww < 768;
   const [newTask, setNewTask] = useState('');
   const [newPriority, setNewPriority] = useState('medium');
+  const [newReminder, setNewReminder] = useState('');
   const [filter, setFilter] = useState('all');
-  const [editId, setEditId] = useState(null);
 
   const handleAdd = () => {
     const text = newTask.trim();
     if (!text) return;
-    onAdd(text, newPriority);
+    onAdd(text, newPriority, newReminder);
     earnXP(5, `📝 Created task: ${text.slice(0, 30)}`);
     setNewTask('');
     setNewPriority('medium');
+    setNewReminder('');
   };
 
   const filtered = tasks.filter(t => {
@@ -3778,21 +3812,24 @@ function TasksPage({ tasks, onToggle, onAdd, onDelete, earnXP, stats }) {
   });
 
   const doneCount = tasks.filter(t => t.done).length;
+  const allTimeDone = Math.max(stats.tasksCompleted || 0, doneCount);
   const priorityColors = { high: T.red, medium: T.amber, low: T.mint };
 
   return (
     <div style={{ animation: 'slide-up .4s ease', padding: isMobile ? 12 : 0 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isMobile ? 16 : 24 }}>
         <div>
-          <h1 style={{ fontSize: isMobile ? 17 : 22, fontWeight: 800, letterSpacing: '-0.8px', display: 'flex', alignItems: 'center', gap: 10 }}>{Ic(ClipboardList, isMobile ? 18 : 24, T.mint)} Tasks & Reminders</h1>
-          <p style={{ fontSize: 13, color: T.text3, marginTop: 4 }}>{doneCount} of {tasks.length} completed · {stats.tasksCompleted} all-time</p>
+          <h1 style={{ fontSize: isMobile ? 17 : 22, fontWeight: 800, letterSpacing: '-0.8px', display: 'flex', alignItems: 'center', gap: 10, color: T.text }}>{Ic(ClipboardList, isMobile ? 18 : 24, T.mint)} Tasks & Reminders</h1>
+          <p style={{ fontSize: 13, color: T.text3, marginTop: 4 }}>{doneCount} of {tasks.length} completed · {allTimeDone} all-time</p>
         </div>
       </div>
 
       {/* Add Task */}
       <div style={{ padding: isMobile ? 12 : 18, borderRadius: 16, background: T.surface, border: `1px solid ${T.border}`, marginBottom: 16, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <input value={newTask} onChange={e => setNewTask(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAdd()}
-          placeholder="Add a new task..." style={{ flex: 1, minWidth: isMobile ? 120 : 200, padding: '10px 14px', borderRadius: 10, border: `1px solid ${T.border}`, background: T.bg2, fontSize: 13, color: T.text, outline: 'none' }} />
+          placeholder="Add a new task or reminder..." style={{ flex: 1, minWidth: isMobile ? 150 : 200, padding: '10px 14px', borderRadius: 10, border: `1px solid ${T.border}`, background: T.bg2, fontSize: 13, color: T.text, outline: 'none' }} />
+        <input type="datetime-local" value={newReminder} onChange={e => setNewReminder(e.target.value)} title="Set reminder time (optional)"
+          style={{ padding: '8px 10px', borderRadius: 10, border: `1px solid ${T.border}`, background: T.bg2, fontSize: 11, color: T.text2, outline: 'none' }} />
         <div style={{ display: 'flex', gap: 4 }}>
           {['high', 'medium', 'low'].map(p => (
             <button key={p} onClick={() => setNewPriority(p)}
@@ -3831,7 +3868,10 @@ function TasksPage({ tasks, onToggle, onAdd, onDelete, earnXP, stats }) {
                 style={{ width: 24, height: 24, borderRadius: 7, border: `2px solid ${t.done ? T.emerald : T.border}`, background: t.done ? T.emerald : 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s' }}>
                 {t.done && Ic(CheckCircle2, 14, '#fff')}
               </button>
-              <span style={{ flex: 1, fontSize: 13, textDecoration: t.done ? 'line-through' : 'none', color: t.done ? T.text3 : T.text }}>{t.text}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 13, textDecoration: t.done ? 'line-through' : 'none', color: t.done ? T.text3 : T.text }}>{t.text}</span>
+                {t.reminder && <span style={{ fontSize: 10, color: T.mint, fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 2 }}>⏰ {new Date(t.reminder).toLocaleString()}</span>}
+              </div>
               <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 8px', borderRadius: 5, background: `${priorityColors[t.priority]}12`, color: priorityColors[t.priority] }}>{t.priority}</span>
               <button onClick={() => onDelete(t.id)} style={{ ...btnBase, width: 24, height: 24, borderRadius: 6, background: T.redSoft }}>{Ic(Trash2, 12, T.red)}</button>
             </div>
@@ -3845,7 +3885,39 @@ function TasksPage({ tasks, onToggle, onAdd, onDelete, earnXP, stats }) {
 // ═══════════════════════════════════════════════════════════════
 // SETTINGS PAGE — Clean & Functional
 // ═══════════════════════════════════════════════════════════════
-function SettingsPage({ stats, settings, onUpdate, darkMode, onToggleDarkMode }) {
+const SettingsToggle = ({ val, onChange }) => (
+  <button onClick={onChange} style={{ width: 44, height: 24, borderRadius: 12, background: val ? T.mint : T.surface3, border: 'none', cursor: 'pointer', position: 'relative', transition: 'background .25s', flexShrink: 0 }}>
+    <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: val ? 23 : 3, transition: 'left .25s cubic-bezier(.4,0,.2,1)', boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }} />
+  </button>
+);
+
+const SettingsRow = ({ icon, iconBg, label, desc, children }) => {
+  const isMobile = useWindowWidth() < 768;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '10px' : '12px 16px', borderRadius: 12, background: T.bg2, border: `1px solid ${T.border}`, gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+        <div style={{ width: 34, height: 34, borderRadius: 9, background: iconBg || T.mintSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{icon}</div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{label}</div>
+          {desc && <div style={{ fontSize: 10, color: T.text3, marginTop: 1 }}>{desc}</div>}
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+};
+
+const SettingsSection = ({ title, desc, children }) => {
+  const isMobile = useWindowWidth() < 768;
+  return (
+    <div style={{ padding: isMobile ? 16 : 24, borderRadius: 16, background: T.surface, border: `1px solid ${T.border}`, marginBottom: 16 }}>
+      {title && <div style={{ marginBottom: desc ? 4 : 16 }}><h2 style={{ fontSize: isMobile ? 14 : 16, fontWeight: 700, color: T.text }}>{title}</h2>{desc && <p style={{ fontSize: isMobile ? 10 : 12, color: T.text3, marginTop: 2 }}>{desc}</p>}</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: title ? 16 : 0 }}>{children}</div>
+    </div>
+  );
+};
+
+function SettingsPage({ stats, settings, onUpdate, darkMode, onToggleDarkMode, onLogout }) {
   const ww = useWindowWidth();
   const isMobile = ww < 768;
   const [activeTab, setActiveTab] = useState('profile');
@@ -3855,6 +3927,10 @@ function SettingsPage({ stats, settings, onUpdate, darkMode, onToggleDarkMode })
   const [dirty, setDirty] = useState(false);
   const level = Math.floor(stats.xp / 100) + 1;
   const levelProgress = stats.xp % 100;
+
+  useEffect(() => {
+    if (!dirty) setPendingSettings({ ...settings });
+  }, [settings, dirty]);
 
   const flashSaved = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
   const update = (key, val) => { setPendingSettings(prev => ({ ...prev, [key]: val })); setDirty(true); };
@@ -3870,34 +3946,12 @@ function SettingsPage({ stats, settings, onUpdate, darkMode, onToggleDarkMode })
   const inputStyle = { width: '100%', padding: '10px 14px', borderRadius: 10, border: `1px solid ${T.border}`, background: T.bg2, fontSize: 13, color: T.text, outline: 'none', transition: 'border .2s, box-shadow .2s' };
   const labelStyle = { fontSize: 12, fontWeight: 600, color: T.text2, marginBottom: 6, display: 'block' };
 
-  const Toggle = ({ val, onChange }) => (
-    <button onClick={onChange} style={{ width: 44, height: 24, borderRadius: 12, background: val ? T.mint : T.surface3, border: 'none', cursor: 'pointer', position: 'relative', transition: 'background .25s', flexShrink: 0 }}>
-      <div style={{ width: 18, height: 18, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: val ? 23 : 3, transition: 'left .25s cubic-bezier(.4,0,.2,1)', boxShadow: '0 1px 4px rgba(0,0,0,0.15)' }} />
-    </button>
-  );
-
-  const SRow = ({ icon, iconBg, label, desc, children }) => (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: isMobile ? '10px' : '12px 16px', borderRadius: 12, background: T.bg2, border: `1px solid ${T.border}`, gap: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-        <div style={{ width: 34, height: 34, borderRadius: 9, background: iconBg || T.mintSoft, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{icon}</div>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600 }}>{label}</div>
-          {desc && <div style={{ fontSize: 10, color: T.text3, marginTop: 1 }}>{desc}</div>}
-        </div>
-      </div>
-      {children}
-    </div>
-  );
-
-  const Section = ({ title, desc, children }) => (
-    <div style={{ padding: isMobile ? 16 : 24, borderRadius: 16, background: T.surface, border: `1px solid ${T.border}`, marginBottom: 16 }}>
-      {title && <div style={{ marginBottom: desc ? 4 : 16 }}><h2 style={{ fontSize: isMobile ? 14 : 16, fontWeight: 700 }}>{title}</h2>{desc && <p style={{ fontSize: isMobile ? 10 : 12, color: T.text3, marginTop: 2 }}>{desc}</p>}</div>}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: title ? 16 : 0 }}>{children}</div>
-    </div>
-  );
+  const Toggle = SettingsToggle;
+  const SRow = SettingsRow;
+  const Section = SettingsSection;
 
   return (
-    <div style={{ animation: 'slide-up .4s ease', padding: isMobile ? 8 : 0, maxWidth: '100%', overflowX: 'hidden' }}>
+    <div style={{ animation: 'slide-up .4s ease', padding: isMobile ? '8px 8px 72px 8px' : 0, maxWidth: '100%', overflowX: 'hidden' }}>
       {/* Header */}
       <div style={{ marginBottom: isMobile ? 12 : 20 }}>
         <h1 style={{ fontSize: isMobile ? 18 : 24, fontWeight: 800, letterSpacing: '-0.8px', marginBottom: 2 }}>Settings</h1>
@@ -4068,13 +4122,19 @@ function SettingsPage({ stats, settings, onUpdate, darkMode, onToggleDarkMode })
                 </div>
                 <button onClick={() => setConfirmModal({ title: 'Delete All Data', msg: 'This permanently deletes all notes, tasks, XP, streak, and settings. Are you sure?', action: () => { localStorage.clear(); window.location.reload(); } })} style={{ marginTop: 10, padding: '8px 16px', borderRadius: 8, background: T.redSoft, border: `1px solid ${T.red}30`, color: T.red, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>{Ic(Trash2, 13, T.red)} Delete All Data</button>
               </div>
+
+              {onLogout && (
+                <button onClick={onLogout} style={{ width: '100%', marginTop: 12, padding: '12px 16px', borderRadius: 12, background: T.surface, border: `1px solid ${T.border}`, color: T.rose, fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                  {Ic(LogOut, 15, T.rose)} Sign Out / Logout
+                </button>
+              )}
             </div>
           )}
         </div>
       </div>
 
       {/* Sticky Save / Reset Bar */}
-      <div style={{ position: 'sticky', bottom: isMobile ? 56 : 0, left: 0, right: 0, padding: isMobile ? '10px 12px' : '14px 24px', background: `linear-gradient(to top, ${T.surface} 80%, transparent)`, borderTop: dirty ? `1px solid ${T.mint}30` : 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, zIndex: 20, transition: 'all .25s' }}>
+      <div style={{ position: 'sticky', bottom: isMobile ? 62 : 0, left: 0, right: 0, padding: isMobile ? '10px 12px' : '14px 24px', background: T.surface, borderRadius: isMobile ? 14 : 0, border: `1px solid ${dirty ? T.mint + '40' : T.border}`, boxShadow: '0 -4px 20px rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, zIndex: 25, transition: 'all .25s' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {dirty && <div style={{ width: 8, height: 8, borderRadius: 4, background: T.amber, animation: 'glow-pulse 1.5s ease infinite' }} />}
           <span style={{ fontSize: 12, color: dirty ? T.amber : T.text3, fontWeight: dirty ? 600 : 400 }}>{dirty ? 'Unsaved changes' : 'All changes saved'}</span>
@@ -4601,14 +4661,22 @@ export default function App() {
   const [userSettings, setUserSettings] = useState(() => loadSettings());
   const [darkMode, setDarkMode] = useState(() => { try { return JSON.parse(localStorage.getItem('smartstudy_dark')) === true; } catch { return false; } });
   const [cmdPalette, setCmdPalette] = useState(false);
+  const [cmdSearch, setCmdSearch] = useState('');
   const notifRef = useRef();
   const ww = useWindowWidth();
   const isMobile = ww < 768;
   const isTablet = ww >= 768 && ww < 1024;
-  const theme = darkMode ? DARK : T;
+  const theme = darkMode ? DARK : LIGHT;
+  Object.assign(T, theme);
 
-  // Persist dark mode
-  useEffect(() => { localStorage.setItem('smartstudy_dark', JSON.stringify(darkMode)); }, [darkMode]);
+  // Persist & apply dark mode to body
+  useEffect(() => {
+    localStorage.setItem('smartstudy_dark', JSON.stringify(darkMode));
+    const th = darkMode ? DARK : LIGHT;
+    Object.assign(T, th);
+    document.body.style.background = th.bg;
+    document.body.style.color = th.text;
+  }, [darkMode]);
 
   // Persist on change
   useEffect(() => { saveAllNotes(allNotes); }, [allNotes]);
@@ -4657,8 +4725,8 @@ export default function App() {
       return t;
     }));
   }, [stats]);
-  const addTask = useCallback((text, priority) => {
-    const t = { id: Date.now().toString(36), text, priority, done: false, created: new Date().toISOString() };
+  const addTask = useCallback((text, priority, reminder = '') => {
+    const t = { id: Date.now().toString(36), text, priority, reminder, done: false, created: new Date().toISOString() };
     setTasks(prev => [t, ...prev]);
     setStats(prev => { const u = { ...prev, tasksCreated: prev.tasksCreated + 1 }; saveStats(u); return u; });
   }, []);
@@ -4673,7 +4741,15 @@ export default function App() {
   useEffect(() => { const h = e => { if (notifRef.current && !notifRef.current.contains(e.target)) { setNotifOpen(false); setProfileOpen(false); } }; document.addEventListener('mousedown', h); return () => document.removeEventListener('mousedown', h); }, []);
 
   const enter = () => setPage('dashboard');
-  const handleLogin = (userData) => { setCurrentUser(userData); if (userData.name) { setUserSettings(prev => ({ ...prev, name: userData.name })); } setPage('dashboard'); };
+  const handleLogin = (userData) => {
+    setCurrentUser(userData);
+    setUserSettings(prev => ({
+      ...prev,
+      name: userData.name || prev.name,
+      email: userData.email || prev.email
+    }));
+    setPage('dashboard');
+  };
 
   if (page === 'landing') return <Landing onEnter={() => setPage('login')} />;
   if (page === 'login') return <LoginPage onLogin={handleLogin} onGoRegister={setPage} />;
@@ -4689,7 +4765,7 @@ export default function App() {
       case 'notes': return <NotesPage allNotes={allNotes} onDeleteNote={deleteNote} onOpenNote={openNoteForStudy} setPage={setPage} onUploadNotes={setNotes} onAddNote={addNote} earnXP={earnXP} language={userSettings.language} />;
       case 'analytics': return <AnalyticsPage stats={stats} allNotes={allNotes} tasks={tasks} />;
       case 'tasks': return <TasksPage tasks={tasks} onToggle={toggleTask} onAdd={addTask} onDelete={deleteTask} earnXP={earnXP} stats={stats} />;
-      case 'settings': return <SettingsPage stats={stats} settings={userSettings} onUpdate={updateSetting} darkMode={darkMode} onToggleDarkMode={() => { const nv = !darkMode; setDarkMode(nv); localStorage.setItem('smartstudy_dark', JSON.stringify(nv)); }} />;
+      case 'settings': return <SettingsPage stats={stats} settings={userSettings} onUpdate={updateSetting} darkMode={darkMode} onToggleDarkMode={() => { const nv = !darkMode; setDarkMode(nv); localStorage.setItem('smartstudy_dark', JSON.stringify(nv)); }} onLogout={() => setPage('landing')} />;
       default: return <DashboardPage setPage={setPage} onUploadNotes={setNotes} allNotes={allNotes} onAddNote={addNote} stats={stats} earnXP={earnXP} userSettings={userSettings} />;
     }
   };
@@ -4700,7 +4776,7 @@ export default function App() {
   }).length;
 
   return (
-    <div style={{ minHeight: '100vh', background: theme.bg, paddingBottom: isMobile ? 60 : 0, overflowX: 'hidden', maxWidth: '100vw' }}>
+    <div style={{ minHeight: '100dvh', background: theme.bg, overflowX: 'hidden', maxWidth: '100vw' }}>
       {/* Sidebar — desktop only */}
       {!isMobile && (
       <aside style={{ position: 'fixed', top: 0, left: 0, bottom: 0, width: (collapsed || isTablet) ? 72 : 260, background: theme.sidebar, display: 'flex', flexDirection: 'column', flexShrink: 0, transition: 'width .25s cubic-bezier(.4,0,.2,1)', zIndex: 50 }}>
@@ -4746,10 +4822,18 @@ export default function App() {
               style={{ width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: 10, background: theme.surface2, border: `1px solid ${theme.border}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {Ic(darkMode ? Sun : Moon, isMobile ? 14 : 16, theme.text2)}
             </button>
-            {!isMobile && <div style={{ position: 'relative' }}>
-              <input placeholder="Search... (Ctrl+K)" onClick={() => setCmdPalette(true)} readOnly style={{ width: isTablet ? 140 : 180, padding: '7px 12px 7px 32px', borderRadius: 8, background: theme.bg2, border: `1px solid ${theme.border}`, color: theme.text, fontSize: 12, outline: 'none', cursor: 'pointer' }} />
-              <div style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }}>{Ic(Search, 13, theme.text3)}</div>
-            </div>}
+            {isMobile ? (
+              <button onClick={() => { setCmdSearch(''); setCmdPalette(true); }} title="Search"
+                style={{ width: 32, height: 32, borderRadius: 10, background: theme.surface2, border: `1px solid ${theme.border}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {Ic(Search, 14, theme.text2)}
+              </button>
+            ) : (
+              <button onClick={() => { setCmdSearch(''); setCmdPalette(true); }}
+                style={{ width: isTablet ? 150 : 190, padding: '7px 12px', borderRadius: 8, background: theme.bg2, border: `1px solid ${theme.border}`, color: theme.text3, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, textAlign: 'left' }}>
+                {Ic(Search, 13, theme.text3)}
+                <span style={{ flex: 1 }}>Search... (Ctrl+K)</span>
+              </button>
+            )}
             <div style={{ position: 'relative' }}>
               <button onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false); if (!notifOpen) { const now = Date.now(); setLastSeenNotif(now); localStorage.setItem('smartstudy_last_seen_notif', String(now)); } }}
                 style={{ width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: 10, background: theme.surface2, border: `1px solid ${theme.border}`, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
@@ -4813,7 +4897,9 @@ export default function App() {
         </header>
 
         {/* Page content */}
-        <main style={{ padding: isMobile ? '8px 6px' : 24, paddingBottom: isMobile ? 72 : 24, background: theme.bg, minHeight: 'calc(100vh - 120px)', overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
+        <main style={(currentPage === 'ai-chat' || currentPage === 'study-tools')
+          ? { height: isMobile ? 'calc(100dvh - 112px)' : 'calc(100vh - 64px)', padding: isMobile ? 0 : 16, background: theme.bg, overflow: 'hidden', maxWidth: '100%' }
+          : { padding: isMobile ? '10px 10px 72px 10px' : 24, background: theme.bg, overflowX: 'hidden', maxWidth: '100%' }}>
           {renderPage()}
         </main>
       </div>
@@ -4823,11 +4909,12 @@ export default function App() {
         <nav style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: 56, background: theme.surface, borderTop: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', zIndex: 200, boxShadow: '0 -2px 10px rgba(0,0,0,0.05)', padding: '0 2px', gap: 0 }}>
           {SIDEBAR_ITEMS.map(item => {
             const active = page === item.id;
+            const shortLabels = { dashboard: 'Home', 'study-tools': 'Tools', 'ai-chat': 'AI Chat', planner: 'Plan', notes: 'Notes', analytics: 'Stats', tasks: 'Tasks', settings: 'Settings' };
             return (
               <button key={item.id} onClick={() => setPage(item.id)}
-                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 2px', borderRadius: 8, color: active ? theme.mint : theme.text3, transition: 'all .15s', flex: '1 1 0', minWidth: 0 }}>
-                {Ic(item.icon, 18, active ? theme.mint : theme.text3)}
-                <span style={{ fontSize: 8, fontWeight: active ? 700 : 400, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%', textAlign: 'center' }}>{item.label}</span>
+                style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, background: 'none', border: 'none', cursor: 'pointer', padding: '4px 1px', borderRadius: 8, color: active ? theme.mint : theme.text3, transition: 'all .15s', flex: '1 1 0', minWidth: 0 }}>
+                {Ic(item.icon, 17, active ? theme.mint : theme.text3)}
+                <span style={{ fontSize: 9, fontWeight: active ? 700 : 500, whiteSpace: 'nowrap' }}>{shortLabels[item.id] || item.label}</span>
               </button>
             );
           })}
@@ -4835,25 +4922,65 @@ export default function App() {
       )}
 
       {/* Command Palette */}
-      {cmdPalette && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: isMobile ? '10vh' : '15vh', background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }} onClick={() => setCmdPalette(false)}>
-          <div style={{ width: '100%', maxWidth: 520, margin: isMobile ? '0 12px' : 0, borderRadius: 18, background: theme.surface, border: `1px solid ${theme.border}`, boxShadow: '0 24px 64px rgba(0,0,0,0.2)', animation: 'slide-up .15s ease' }} onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '14px 18px', borderBottom: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
-              {Ic(Search, 18, theme.text3)}
-              <input autoFocus placeholder="Search pages, tools..." style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', color: theme.text, fontSize: 15 }} onKeyDown={e => { if (e.key === 'Escape') setCmdPalette(false); }} />
-              <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: theme.bg2, color: theme.text3, fontWeight: 600 }}>ESC</span>
-            </div>
-            <div style={{ padding: 8, maxHeight: 320, overflowY: 'auto' }}>
-              {SIDEBAR_ITEMS.map(item => (
-                <button key={item.id} onClick={() => { setPage(item.id); setCmdPalette(false); }}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: 'none', background: page === item.id ? `${theme.mint}10` : 'transparent', color: page === item.id ? theme.mint : theme.text2, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, fontWeight: page === item.id ? 600 : 400, textAlign: 'left', marginBottom: 2 }}>
-                  {Ic(item.icon, 15)} {item.label}
-                </button>
-              ))}
+      {cmdPalette && (() => {
+        const q = cmdSearch.trim().toLowerCase();
+        const pageMatches = SIDEBAR_ITEMS.filter(item => !q || item.label.toLowerCase().includes(q) || item.id.toLowerCase().includes(q));
+        const noteMatches = q ? allNotes.filter(n => n.name.toLowerCase().includes(q) || (n.content || '').toLowerCase().includes(q)).slice(0, 4) : [];
+        const taskMatches = q ? tasks.filter(t => t.text.toLowerCase().includes(q)).slice(0, 4) : [];
+        const hasAny = pageMatches.length > 0 || noteMatches.length > 0 || taskMatches.length > 0;
+
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 500, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: isMobile ? '10vh' : '15vh', background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }} onClick={() => setCmdPalette(false)}>
+            <div style={{ width: '100%', maxWidth: 520, margin: isMobile ? '0 12px' : 0, borderRadius: 18, background: theme.surface, border: `1px solid ${theme.border}`, boxShadow: '0 24px 64px rgba(0,0,0,0.25)', animation: 'slide-up .15s ease' }} onClick={e => e.stopPropagation()}>
+              <div style={{ padding: '14px 18px', borderBottom: `1px solid ${theme.border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+                {Ic(Search, 18, theme.text3)}
+                <input autoFocus value={cmdSearch} onChange={e => setCmdSearch(e.target.value)} placeholder="Search pages, notes, tasks..."
+                  style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', color: theme.text, fontSize: 15 }}
+                  onKeyDown={e => {
+                    if (e.key === 'Escape') setCmdPalette(false);
+                    if (e.key === 'Enter') {
+                      if (pageMatches.length > 0) { setPage(pageMatches[0].id); setCmdPalette(false); }
+                      else if (noteMatches.length > 0) { openNoteForStudy(noteMatches[0]); setCmdPalette(false); }
+                      else if (taskMatches.length > 0) { setPage('tasks'); setCmdPalette(false); }
+                    }
+                  }} />
+                <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, background: theme.bg2, color: theme.text3, fontWeight: 600 }}>ESC</span>
+              </div>
+              <div style={{ padding: 8, maxHeight: 340, overflowY: 'auto' }}>
+                {pageMatches.map(item => (
+                  <button key={item.id} onClick={() => { setPage(item.id); setCmdPalette(false); }}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: 'none', background: page === item.id ? `${theme.mint}15` : 'transparent', color: page === item.id ? theme.mint : theme.text, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, fontWeight: page === item.id ? 600 : 400, textAlign: 'left', marginBottom: 2 }}>
+                    {Ic(item.icon, 15, page === item.id ? theme.mint : theme.text2)} {item.label}
+                  </button>
+                ))}
+                {noteMatches.length > 0 && (
+                  <div style={{ padding: '6px 14px 2px', fontSize: 10, fontWeight: 700, color: theme.text3, textTransform: 'uppercase' }}>Notes</div>
+                )}
+                {noteMatches.map(n => (
+                  <button key={n.id} onClick={() => { openNoteForStudy(n); setCmdPalette(false); }}
+                    style={{ width: '100%', padding: '9px 14px', borderRadius: 10, border: 'none', background: 'transparent', color: theme.text, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, textAlign: 'left' }}>
+                    {Ic(FileText, 14, theme.mint)} <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.name}</span>
+                  </button>
+                ))}
+                {taskMatches.length > 0 && (
+                  <div style={{ padding: '6px 14px 2px', fontSize: 10, fontWeight: 700, color: theme.text3, textTransform: 'uppercase' }}>Tasks</div>
+                )}
+                {taskMatches.map(t => (
+                  <button key={t.id} onClick={() => { setPage('tasks'); setCmdPalette(false); }}
+                    style={{ width: '100%', padding: '9px 14px', borderRadius: 10, border: 'none', background: 'transparent', color: theme.text, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, textAlign: 'left' }}>
+                    {Ic(ClipboardList, 14, theme.amber)} <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.text}</span>
+                  </button>
+                ))}
+                {!hasAny && (
+                  <div style={{ padding: 24, textAlign: 'center', color: theme.text3, fontSize: 12 }}>
+                    No results found for "{cmdSearch}"
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
